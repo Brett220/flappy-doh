@@ -124,7 +124,7 @@
     pointer-events: none;
   }
   .duo { display: flex; gap: 10px; margin-top: 12px; }
-  .duo .btn { margin-top: 0; font-size: 18px; padding: 10px 6px; }
+  .duo .btn { margin-top: 0; font-size: 16px; padding: 10px 4px; }
   .coin {
     display: inline-block; font-weight: 900; font-size: 18px; background: #fff3b8;
     border: 3px solid var(--ink); border-radius: 999px; padding: 1px 12px;
@@ -161,6 +161,25 @@
     background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 999px; font-weight: 800;
     z-index: 30; pointer-events: none; white-space: nowrap;
   }
+  .ci {
+    display: inline-block; width: .95em; height: .95em; border-radius: 50%; position: relative;
+    vertical-align: -0.12em; margin-right: .22em;
+    background: radial-gradient(circle at 35% 30%, #fff7b8 0, #ffd84d 42%, #e9a800 100%);
+    border: .13em solid var(--ink);
+  }
+  .ci::after {
+    content: ''; position: absolute; left: 28%; top: 28%; width: 44%; height: 44%;
+    border-radius: 50%; border: .09em solid rgba(170,105,0,.65);
+  }
+  .empty { grid-column: 1 / -1; padding: 14px 8px 6px; font-weight: 800; opacity: .65; }
+  .card.owned { opacity: .55; }
+  #confirmCv {
+    width: 96px; height: 96px; display: block; margin: 6px auto 10px;
+    background: #e6f6ff; border: 3px solid var(--ink); border-radius: 22px;
+  }
+  #confirm .panel h2 { font-size: 34px; margin-bottom: 4px; }
+  #confirm .sub { font-size: 18px; opacity: 1; line-height: 1.5; }
+  #confirm .sub small { font-size: 14px; opacity: .7; }
 </style>
 </head>
 <body>
@@ -174,8 +193,8 @@
     <p class="sub">Pick your Doh</p>
     <div id="dohs" class="grid"></div>
     <button id="play" class="btn">Play</button>
-    <button id="openCloset" class="btn secondary">👒 Closet</button>
-    <div class="row"><span id="menuBest">Best: 0</span><span id="menuTokens" class="coin">🪙 0</span><button id="mute" class="icon-btn" aria-label="Sound">🔊</button></div>
+    <div class="duo"><button id="openCloset" class="btn secondary">👒 My Closet</button><button id="openShop" class="btn secondary">🛍️ Shop</button></div>
+    <div class="row"><span id="menuBest">Best: 0</span><span id="menuTokens" class="coin"><span class="ci"></span>0</span><button id="mute" class="icon-btn" aria-label="Sound">🔊</button></div>
   </div>
 </div>
 
@@ -186,17 +205,18 @@
       <div><small>Score</small><b id="finalScore">0</b></div>
       <div><small>Best</small><b id="finalBest">0</b></div>
     </div>
-    <div><span id="earned" class="earned hidden">+0 🪙</span></div>
+    <div><span id="earned" class="earned hidden">+0 <span class="ci"></span></span></div>
     <div id="newBest" class="badge hidden">New best!</div>
     <button id="again" class="btn">Play again</button>
     <div class="duo">
       <button id="change" class="btn secondary">Change Doh</button>
       <button id="overCloset" class="btn secondary">👒 Closet</button>
+      <button id="overShop" class="btn secondary">🛍️ Shop</button>
     </div>
   </div>
 </div>
 
-<div id="hud" class="hud hidden">🪙 0</div>
+<div id="hud" class="hud hidden"><span class="ci"></span>0</div>
 <button id="pauseBtn" class="icon-btn hidden" aria-label="Pause">⏸</button>
 <div id="count" class="hidden">3</div>
 
@@ -211,8 +231,12 @@
 
 <div id="closet" class="overlay hidden">
   <div class="panel">
-    <div class="chead"><h3>Closet</h3><span id="closetTokens" class="coin">🪙 0</span></div>
+    <div class="chead"><h3 id="closetTitle">My Closet</h3><span id="closetTokens" class="coin"><span class="ci"></span>0</span></div>
     <canvas id="preview"></canvas>
+    <div class="tabs">
+      <button class="tab sel" data-mode="mine">👒 My Closet</button>
+      <button class="tab" data-mode="shop">🛍️ Shop</button>
+    </div>
     <div class="tabs">
       <button class="tab sel" data-slot="hat">Hats</button>
       <button class="tab" data-slot="face">Faces</button>
@@ -220,6 +244,14 @@
     </div>
     <div id="items" class="grid scroll"></div>
     <button id="closetDone" class="btn">Done</button>
+  </div>
+</div>
+<div id="confirm" class="overlay hidden">
+  <div class="panel">
+    <h2>Buy it?</h2>
+    <canvas id="confirmCv"></canvas>
+    <p id="confirmText" class="sub"></p>
+    <div class="duo"><button id="confirmNo" class="btn secondary">Not yet</button><button id="confirmYes" class="btn">Buy it!</button></div>
   </div>
 </div>
 <div id="toast" class="toast hidden"></div>
@@ -538,11 +570,21 @@
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.03);
   }
+  function noise(dur, vol) {
+    if (!actx || muted) return;
+    const n = Math.floor(actx.sampleRate * dur), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = actx.createBufferSource(), g = actx.createGain();
+    src.buffer = buf; g.gain.value = vol; src.connect(g); g.connect(actx.destination); src.start();
+  }
   const sfx = {
     flap() { tone(180 + Math.random() * 40, 480, 0.13, 'sine', 0.22); },
     point() { tone(880, 1200, 0.08, 'triangle', 0.12); tone(1320, 1760, 0.12, 'triangle', 0.1, 0.07); },
     hit() { tone(260, 60, 0.3, 'square', 0.08); tone(140, 40, 0.35, 'sine', 0.3); },
     splat() { tone(120, 45, 0.25, 'sine', 0.3); },
+    boom() { noise(0.5, 0.4); tone(160, 30, 0.55, 'sawtooth', 0.2); tone(90, 25, 0.6, 'sine', 0.35); },
+    star() { tone(520, 1040, 0.12, 'square', 0.06); tone(780, 1560, 0.12, 'square', 0.06, 0.09); tone(1040, 2080, 0.22, 'square', 0.06, 0.18); },
+    starEnd() { tone(900, 300, 0.28, 'triangle', 0.1); },
   };
 
   // ---------- game state ----------
@@ -553,11 +595,13 @@
   let tokens = store.get('tokens', 0), runTokens = 0;
   let owned = store.get('owned', []);
   let equip = Object.assign({ hat: null, face: null, outfit: null }, store.get('equip', {}));
+  let rings = [], wasStar = false, starT = 0, closetMode = 'mine', confirmItem = null;
   let paused = false, countdown = 0, closetOpen = false, closetSlot = 'hat', closetFrom = 'menu';
   const bird = { x: 0, y: H * 0.45, vy: 0, r: 22, rot: 0, s: 0, sv: 0, blinkT: 2, blink: 0, flapT: 0 };
   const clouds = Array.from({ length: 7 }, (_, i) => ({ x: i * 140 + Math.random() * 80, y: 40 + Math.random() * 220, s: 0.6 + Math.random() * 0.8 }));
 
   const G = 1500, FLAP = -440, R_HIT = 18;
+  const starNow = () => (state === 'play' || state === 'dying' || state === 'over') && ((score >= 20 && score < 25) || (score >= 40 && score < 50));
   const gapFor = () => Math.max(140, 182 - score * 1.4);
   const speedFor = () => Math.min(235, 165 + score * 2);
 
@@ -565,7 +609,7 @@
   const scoreEl = $('score'), hintEl = $('hint'), menuEl = $('menu'), overEl = $('over');
 
   function reset() {
-    score = 0; pipes = []; parts = []; pops = []; runTokens = 0; flash = 0; shake = 0;
+    score = 0; pipes = []; parts = []; pops = []; rings = []; wasStar = false; runTokens = 0; flash = 0; shake = 0;
     bird.x = Math.min(W * 0.3, 150); bird.y = H * 0.45; bird.vy = 0; bird.rot = 0; bird.s = 0; bird.sv = 0;
     scoreEl.textContent = '0';
   }
@@ -621,21 +665,32 @@
     burst(bird.x, bird.y, DOHS[dohIdx].puff, 16, 260);
   }
 
+  function explode() {
+    const x = bird.x, y = GY - 6, star = starNow();
+    const base = [DOHS[dohIdx].puff, '#ffffff', '#ffd84d', '#ff8fc4'];
+    for (let i = 0; i < 48; i++) {
+      const a = -Math.PI * (0.04 + 0.92 * Math.random()), v = 140 + Math.random() * 380;
+      const col = star ? `hsl(${Math.random() * 360},100%,60%)` : base[i % base.length];
+      parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1 + Math.random() * 0.5, max: 1.5, r: 3 + Math.random() * 7, col });
+    }
+    rings.push({ x, y, life: 0.5, max: 0.5 });
+    sfx.boom(); flash = 0.8; shake = 0.55;
+  }
+
   function landed() {
     bird.y = GY - bird.r; bird.vy = 0; bird.sv -= 16;
-    sfx.splat(); state = 'over';
-    burst(bird.x, GY - 4, DOHS[dohIdx].puff, 10, 160);
+    state = 'over'; explode();
     const isBest = score > best;
     if (isBest) { best = score; store.set('best', best); }
     setTimeout(() => {
       if (state !== 'over') return;
       $('finalScore').textContent = score; $('finalBest').textContent = best;
       $('newBest').classList.toggle('hidden', !isBest || score === 0);
-      $('earned').textContent = '+' + runTokens + ' 🪙';
+      $('earned').innerHTML = '+' + runTokens + ' <span class="ci"></span>';
       $('earned').classList.toggle('hidden', runTokens === 0);
       scoreEl.classList.add('hidden');
       overEl.classList.remove('hidden');
-    }, 650);
+    }, 950);
   }
 
   function hitRect(cx, cy, r, x, y, w, h) {
@@ -646,6 +701,15 @@
   // ---------- update ----------
   function update(dt) {
     time += dt;
+    const star = starNow();
+    if (star !== wasStar) { wasStar = star; if (star) sfx.star(); else sfx.starEnd(); }
+    if (star && state !== 'over') {
+      starT -= dt;
+      if (starT <= 0) {
+        starT = 0.04;
+        parts.push({ x: bird.x + (Math.random() - 0.5) * 34, y: bird.y + (Math.random() - 0.5) * 34, vx: -70 + (Math.random() - 0.5) * 90, vy: (Math.random() - 0.5) * 120, life: 0.5, max: 0.5, r: 2 + Math.random() * 4, col: `hsl(${Math.random() * 360},100%,60%)` });
+      }
+    }
     const moving = state === 'menu' || state === 'ready' || state === 'play';
     const spd = speedFor();
     if (moving) scroll += spd * dt;
@@ -691,16 +755,18 @@
           p.scored = true; score++; scoreEl.textContent = score; sfx.point();
           const gain = score % 10 === 0 ? 5 : 1;
           setTokens(tokens + gain); runTokens += gain;
-          pops.push({ x: bird.x + 24, y: bird.y - 30, text: '+' + gain, life: 0.9, gold: gain > 1 });
+          pops.push({ x: W / 2, y: GY + 56, text: '+' + gain, life: 1, gold: gain > 1 });
           burst(bird.x + 20, bird.y - 20, '#ffd84d', 6, 120);
           scoreEl.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 180 });
         }
       }
     }
 
-    for (const p of parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.vx *= 0.98; }
+    for (const p of parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.vx *= 0.98; if (p.y > GY - 2 && p.vy > 0) { p.y = GY - 2; p.vy *= -0.35; p.vx *= 0.7; } }
+    for (const g of rings) g.life -= dt;
+    rings = rings.filter(g => g.life > 0);
     parts = parts.filter(p => p.life > 0);
-    for (const p of pops) { p.life -= dt; p.y -= 45 * dt; }
+    for (const p of pops) { p.life -= dt; p.y -= 22 * dt; }
     pops = pops.filter(p => p.life > 0);
     for (const c of clouds) { if (moving) c.x -= spd * 0.15 * c.s * dt; if (c.x < -120) { c.x = W + 60 + Math.random() * 100; c.y = 40 + Math.random() * 220; } }
     flash = Math.max(0, flash - dt * 4);
@@ -738,6 +804,29 @@
     rrPath(ctx, cx, cy, cw, ch, 10); ctx.fillStyle = g2; ctx.fill(); ctx.stroke();
   }
 
+  // star power: draw the Doh offscreen, then recolor it with a cycling hue (keeps shading + outlines)
+  const off = document.createElement('canvas'), octx = off.getContext('2d');
+  const sil = document.createElement('canvas'), sctx = sil.getContext('2d');
+  const OFF = 170;
+  const BLEND_OK = (() => { const c = document.createElement('canvas').getContext('2d'); c.globalCompositeOperation = 'color'; return c.globalCompositeOperation === 'color'; })();
+  function drawRainbowDoh(id, r, st, hue) {
+    const px = Math.ceil(OFF * scale);
+    if (off.width !== px) { off.width = off.height = sil.width = sil.height = px; }
+    octx.setTransform(1, 0, 0, 1, 0, 0); octx.globalCompositeOperation = 'source-over'; octx.globalAlpha = 1; octx.clearRect(0, 0, px, px);
+    octx.setTransform(scale, 0, 0, scale, px / 2, px / 2);
+    drawDoh(octx, id, r, st);
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.setTransform(1, 0, 0, 1, 0, 0); sctx.globalCompositeOperation = 'source-over'; sctx.clearRect(0, 0, px, px);
+    sctx.drawImage(off, 0, 0);
+    sctx.globalCompositeOperation = 'source-in';
+    sctx.fillStyle = `hsl(${hue},100%,${BLEND_OK ? 50 : 60}%)`; sctx.fillRect(0, 0, px, px);
+    octx.globalCompositeOperation = BLEND_OK ? 'color' : 'source-atop';
+    octx.globalAlpha = BLEND_OK ? 1 : 0.55;
+    octx.drawImage(sil, 0, 0);
+    octx.globalAlpha = 1; octx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(off, -OFF / 2, -OFF / 2, OFF, OFF);
+  }
+
   function render() {
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     if (shake > 0) ctx.translate((Math.random() - 0.5) * 12 * shake, (Math.random() - 0.5) * 12 * shake);
@@ -772,22 +861,45 @@
       ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = 1;
-
-    // bird
-    const s = bird.s;
-    ctx.save();
-    ctx.translate(bird.x, bird.y); ctx.rotate(bird.rot);
-    ctx.scale(1 - s * 0.26, 1 + s * 0.32);
-    drawDoh(ctx, DOHS[dohIdx].id, bird.r, { t: time, blink: bird.blink > 0, dead: state === 'dying' || state === 'over', flap: bird.flapT > 0, wear: equip });
-    ctx.restore();
-
-    ctx.font = '900 24px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
-    for (const p of pops) {
-      ctx.globalAlpha = Math.min(1, p.life * 2.5);
-      ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.strokeText(p.text + ' 🪙', p.x, p.y);
-      ctx.fillStyle = p.gold ? '#ffd84d' : '#fff'; ctx.fillText(p.text + ' 🪙', p.x, p.y);
+    for (const g of rings) {
+      const k = 1 - g.life / g.max;
+      ctx.globalAlpha = 1 - k; ctx.lineWidth = 8 * (1 - k) + 2; ctx.strokeStyle = '#fff8d0';
+      ctx.beginPath(); ctx.arc(g.x, g.y, 14 + k * 110, 0, TAU); ctx.stroke();
     }
     ctx.globalAlpha = 1;
+
+    // bird
+    if (state !== 'over') {
+      const s = bird.s, star = starNow(), hue = (time * 420) % 360;
+      const st = { t: time, blink: bird.blink > 0, dead: state === 'dying', flap: bird.flapT > 0, wear: equip };
+      if (star) {
+        const gl = ctx.createRadialGradient(bird.x, bird.y, 6, bird.x, bird.y, 52);
+        gl.addColorStop(0, `hsla(${hue},100%,70%,0.6)`); gl.addColorStop(1, `hsla(${hue},100%,70%,0)`);
+        ctx.fillStyle = gl; ctx.fillRect(bird.x - 56, bird.y - 56, 112, 112);
+      }
+      ctx.save();
+      ctx.translate(bird.x, bird.y); ctx.rotate(bird.rot);
+      ctx.scale(1 - s * 0.26, 1 + s * 0.32);
+      if (star) drawRainbowDoh(DOHS[dohIdx].id, bird.r, st, hue);
+      else drawDoh(ctx, DOHS[dohIdx].id, bird.r, st);
+      ctx.restore();
+    }
+
+    ctx.font = '900 26px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.lineJoin = 'round';
+    for (const p of pops) {
+      ctx.globalAlpha = Math.min(1, p.life * 2.5);
+      const tw = ctx.measureText(p.text).width, x0 = p.x - (tw + 30) / 2;
+      ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.strokeText(p.text, x0, p.y);
+      ctx.fillStyle = p.gold ? '#ffd84d' : '#fff'; ctx.fillText(p.text, x0, p.y);
+      const cx = x0 + tw + 17, cy = p.y - 9;
+      const g = ctx.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, 12);
+      g.addColorStop(0, '#fff7b8'); g.addColorStop(0.45, '#ffd84d'); g.addColorStop(1, '#e9a800');
+      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, TAU); ctx.fillStyle = g; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, TAU); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(170,105,0,0.65)'; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'start';
 
     if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.7})`; ctx.fillRect(-20, -20, W + 40, H + 40); }
   }
@@ -804,6 +916,7 @@
     } else update(dt);
     render();
     if (closetOpen) drawPreview();
+    if (confirmItem) drawConfirm();
     syncUI();
     requestAnimationFrame(frame);
   }
@@ -829,75 +942,98 @@
     });
   }
 
-  // ---------- tokens, closet ----------
-  const hudEl = $('hud'), pauseBtn = $('pauseBtn'), pauseEl = $('pause'), countEl = $('count'), closetEl = $('closet');
+  // ---------- tokens, closet, shop ----------
+  const hudEl = $('hud'), pauseBtn = $('pauseBtn'), pauseEl = $('pause'), countEl = $('count'), closetEl = $('closet'), confirmEl = $('confirm');
+  const coin = n => '<span class="ci"></span>' + n;
   function setTokens(n) {
     tokens = n; store.set('tokens', n);
-    const txt = '🪙 ' + n;
-    hudEl.textContent = txt; $('menuTokens').textContent = txt; $('closetTokens').textContent = txt;
+    hudEl.innerHTML = coin(n); $('menuTokens').innerHTML = coin(n); $('closetTokens').innerHTML = coin(n);
   }
   let toastT = 0;
-  function toast(msg) {
-    const el = $('toast'); el.textContent = msg; el.classList.remove('hidden');
-    clearTimeout(toastT); toastT = setTimeout(() => el.classList.add('hidden'), 1500);
+  function toast(html) {
+    const el = $('toast'); el.innerHTML = html; el.classList.remove('hidden');
+    clearTimeout(toastT); toastT = setTimeout(() => el.classList.add('hidden'), 1600);
   }
 
   function buildCloset() {
-    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('sel', b.dataset.slot === closetSlot));
+    document.querySelectorAll('.tab[data-slot]').forEach(b => b.classList.toggle('sel', b.dataset.slot === closetSlot));
+    document.querySelectorAll('.tab[data-mode]').forEach(b => b.classList.toggle('sel', b.dataset.mode === closetMode));
+    const shop = closetMode === 'shop';
+    $('closetTitle').textContent = shop ? 'Shop' : 'My Closet';
     const wrap = $('items'); wrap.innerHTML = ''; wrap.scrollTop = 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const id = DOHS[dohIdx].id;
-    const list = [{ id: null, name: 'None' }].concat(ITEMS.filter(i => i.slot === closetSlot));
+    const slotItems = ITEMS.filter(i => i.slot === closetSlot);
+    const list = shop ? slotItems : [{ id: null, name: 'None' }].concat(slotItems.filter(i => owned.includes(i.id)));
     list.forEach(it => {
-      const worn = equip[closetSlot] === it.id;
       const isOwned = it.id === null || owned.includes(it.id);
-      const cant = !isOwned && tokens < it.price;
+      const worn = !shop && equip[closetSlot] === it.id;
+      const cant = shop && !isOwned && tokens < it.price;
       const b = document.createElement('button');
-      b.className = 'card' + (worn ? ' sel' : '') + (cant ? ' cant' : '');
+      b.className = 'card' + (worn ? ' sel' : '') + (cant ? ' cant' : '') + (shop && isOwned ? ' owned' : '');
       const c = document.createElement('canvas'); c.width = 64 * dpr; c.height = 64 * dpr;
       const x = c.getContext('2d'); x.scale(dpr, dpr); x.translate(32, 38);
       drawDoh(x, id, 16, { t: 1, wear: { [closetSlot]: it.id } });
       b.appendChild(c); b.appendChild(document.createTextNode(it.name));
       const p = document.createElement('span'); p.className = 'price';
-      p.textContent = worn ? 'Wearing' : it.id === null ? 'Take off' : isOwned ? 'Owned' : '🪙 ' + it.price;
+      p.innerHTML = shop ? (isOwned ? 'Owned ✓' : coin(it.price)) : worn ? 'Wearing' : it.id === null ? 'Take off' : 'Wear';
       b.appendChild(p);
       b.addEventListener('click', () => onItem(it, b));
       wrap.appendChild(b);
     });
+    if (!shop && list.length === 1) {
+      const e = document.createElement('div'); e.className = 'empty';
+      e.textContent = 'Nothing here yet. Visit the Shop to get something!';
+      wrap.appendChild(e);
+    }
   }
 
   function onItem(it, el) {
     unlockAudio();
     const slot = closetSlot;
-    if (it.id === null || owned.includes(it.id)) {
+    if (closetMode === 'mine') {
       equip[slot] = (it.id !== null && equip[slot] === it.id) ? null : it.id;   // tap a worn item to take it off
-      sfx.flap();
-    } else if (tokens >= it.price) {
-      setTokens(tokens - it.price); owned.push(it.id); store.set('owned', owned);
-      equip[slot] = it.id; sfx.point();
-      toast('Bought ' + it.name + '!');
-    } else {
+      sfx.flap(); store.set('equip', equip); buildCloset(); return;
+    }
+    if (owned.includes(it.id)) { toast('Already in your closet!'); return; }
+    if (tokens < it.price) {
       el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
-      toast('Need ' + (it.price - tokens) + ' more 🪙');
+      toast('Need ' + (it.price - tokens) + ' more ' + coin(''));
       tone(220, 110, 0.18, 'square', 0.06);
       return;
     }
-    store.set('equip', equip);
-    buildCloset();
+    askBuy(it);
   }
 
-  function openCloset(from) {
-    closetFrom = from; closetOpen = true;
+  function askBuy(it) {
+    confirmItem = it;
+    $('confirmText').innerHTML = 'Spend ' + coin(it.price) + ' on <b>' + it.name + '</b>?<br><small>You\'ll have ' + coin(tokens - it.price) + ' left</small>';
+    confirmEl.classList.remove('hidden');
+  }
+  function closeConfirm() { confirmItem = null; confirmEl.classList.add('hidden'); }
+  $('confirmNo').addEventListener('click', closeConfirm);
+  $('confirmYes').addEventListener('click', () => {
+    const it = confirmItem; closeConfirm();
+    if (!it || owned.includes(it.id) || tokens < it.price) return;
+    unlockAudio();
+    setTokens(tokens - it.price); owned.push(it.id); store.set('owned', owned);
+    equip[it.slot] = it.id; store.set('equip', equip);
+    sfx.point(); toast('Bought ' + it.name + '! Wearing it now.');
+    buildCloset();
+  });
+
+  function openCloset(from, mode) {
+    closetFrom = from; closetMode = mode; closetOpen = true;
     menuEl.classList.add('hidden'); overEl.classList.add('hidden');
     closetEl.classList.remove('hidden'); buildCloset();
   }
   function closeCloset() {
-    closetOpen = false; closetEl.classList.add('hidden');
+    closeConfirm(); closetOpen = false; closetEl.classList.add('hidden');
     if (closetFrom === 'over') overEl.classList.remove('hidden'); else menuEl.classList.remove('hidden');
     buildCards();
   }
 
-  const pv = $('preview'), pctx = pv.getContext('2d');
+  const pv = $('preview'), pctx = pv.getContext('2d'), cv = $('confirmCv'), cctx = cv.getContext('2d');
   function drawPreview() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     if (pv.width !== Math.round(112 * dpr)) { pv.width = pv.height = Math.round(112 * dpr); }
@@ -907,10 +1043,22 @@
     drawDoh(pctx, DOHS[dohIdx].id, 30, { t: time, blink: bird.blink > 0, wear: equip });
     pctx.restore();
   }
+  function drawConfirm() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    if (cv.width !== Math.round(96 * dpr)) { cv.width = cv.height = Math.round(96 * dpr); }
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0); cctx.clearRect(0, 0, 96, 96);
+    const sq = Math.sin(time * 3) * 0.04;
+    cctx.save(); cctx.translate(48, 58 + Math.sin(time * 2) * 2); cctx.scale(1 - sq, 1 + sq);
+    drawDoh(cctx, DOHS[dohIdx].id, 26, { t: time, blink: bird.blink > 0, wear: Object.assign({}, equip, { [confirmItem.slot]: confirmItem.id }) });
+    cctx.restore();
+  }
 
-  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { closetSlot = b.dataset.slot; buildCloset(); }));
-  $('openCloset').addEventListener('click', () => openCloset('menu'));
-  $('overCloset').addEventListener('click', () => openCloset('over'));
+  document.querySelectorAll('.tab[data-slot]').forEach(b => b.addEventListener('click', () => { closetSlot = b.dataset.slot; buildCloset(); }));
+  document.querySelectorAll('.tab[data-mode]').forEach(b => b.addEventListener('click', () => { closetMode = b.dataset.mode; buildCloset(); }));
+  $('openCloset').addEventListener('click', () => openCloset('menu', 'mine'));
+  $('openShop').addEventListener('click', () => openCloset('menu', 'shop'));
+  $('overCloset').addEventListener('click', () => openCloset('over', 'mine'));
+  $('overShop').addEventListener('click', () => openCloset('over', 'shop'));
   $('closetDone').addEventListener('click', closeCloset);
 
   // ---------- pause (auto-pauses when you leave the app) ----------
