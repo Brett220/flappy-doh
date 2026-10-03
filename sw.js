@@ -1,7 +1,7 @@
 // Offline support: serve the game from the phone's cache, and quietly
 // refresh the cache in the background whenever the phone is online.
 // Bump VERSION when you change files to force a clean re-download.
-const VERSION = 'flappydoh-v1';
+const VERSION = 'flappydoh-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

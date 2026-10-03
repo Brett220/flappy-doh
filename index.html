@@ -52,7 +52,7 @@
   @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
 
   .overlay {
-    position: fixed; inset: 0;
+    position: fixed; inset: 0; z-index: 10;
     display: flex; align-items: center; justify-content: center;
     padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
     background: rgba(42,31,51,0.25);
@@ -111,6 +111,56 @@
     background: #ffd84d; border: 3px solid var(--ink); border-radius: 999px; font-weight: 900;
     animation: pulse .6s ease-in-out infinite alternate;
   }
+  .hud {
+    position: fixed; top: calc(env(safe-area-inset-top) + 14px); left: 14px; z-index: 5;
+    background: #fff3b8; border: 3px solid var(--ink); border-radius: 999px;
+    padding: 3px 12px; font-weight: 900; font-size: 18px; box-shadow: 0 3px 0 var(--ink);
+    pointer-events: none;
+  }
+  #pauseBtn { position: fixed; top: calc(env(safe-area-inset-top) + 10px); right: 14px; z-index: 5; }
+  #count {
+    position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+    font-size: 150px; font-weight: 900; color: #fff; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill;
+    pointer-events: none;
+  }
+  .duo { display: flex; gap: 10px; margin-top: 12px; }
+  .duo .btn { margin-top: 0; font-size: 18px; padding: 10px 6px; }
+  .coin {
+    display: inline-block; font-weight: 900; font-size: 18px; background: #fff3b8;
+    border: 3px solid var(--ink); border-radius: 999px; padding: 1px 12px;
+  }
+  .earned {
+    display: inline-block; margin: 0 4px 12px; padding: 4px 14px; background: #fff3b8;
+    border: 3px solid var(--ink); border-radius: 999px; font-weight: 900;
+  }
+  #closet .panel { display: flex; flex-direction: column; max-height: 100%; }
+  .chead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .chead h3 {
+    margin: 0; font-size: 32px; font-weight: 900; color: var(--pink);
+    -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill;
+  }
+  #preview {
+    width: 112px; height: 112px; margin: 0 auto 8px; display: block; flex: none;
+    background: #e6f6ff; border: 3px solid var(--ink); border-radius: 24px;
+  }
+  .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex: none; }
+  .tab {
+    flex: 1; appearance: none; font: inherit; font-weight: 900; font-size: 14px; padding: 7px 0;
+    border: 3px solid var(--ink); border-radius: 14px; background: #efe9ff; color: inherit;
+    cursor: pointer; touch-action: manipulation;
+  }
+  .tab.sel { background: var(--pink); color: #fff; }
+  .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; flex: 1 1 auto; min-height: 0; }
+  #items { padding: 3px; margin-bottom: 12px; align-content: start; }
+  .card .price { display: block; margin-top: 3px; font-size: 11px; opacity: .85; }
+  .card.cant .price { color: #c0264f; }
+  .card.shake { animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 999px; font-weight: 800;
+    z-index: 30; pointer-events: none; white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -124,7 +174,8 @@
     <p class="sub">Pick your Doh</p>
     <div id="dohs" class="grid"></div>
     <button id="play" class="btn">Play</button>
-    <div class="row"><span id="menuBest">Best: 0</span><button id="mute" class="icon-btn" aria-label="Sound">🔊</button></div>
+    <button id="openCloset" class="btn secondary">👒 Closet</button>
+    <div class="row"><span id="menuBest">Best: 0</span><span id="menuTokens" class="coin">🪙 0</span><button id="mute" class="icon-btn" aria-label="Sound">🔊</button></div>
   </div>
 </div>
 
@@ -135,11 +186,43 @@
       <div><small>Score</small><b id="finalScore">0</b></div>
       <div><small>Best</small><b id="finalBest">0</b></div>
     </div>
+    <div><span id="earned" class="earned hidden">+0 🪙</span></div>
     <div id="newBest" class="badge hidden">New best!</div>
     <button id="again" class="btn">Play again</button>
-    <button id="change" class="btn secondary">Change Doh</button>
+    <div class="duo">
+      <button id="change" class="btn secondary">Change Doh</button>
+      <button id="overCloset" class="btn secondary">👒 Closet</button>
+    </div>
   </div>
 </div>
+
+<div id="hud" class="hud hidden">🪙 0</div>
+<button id="pauseBtn" class="icon-btn hidden" aria-label="Pause">⏸</button>
+<div id="count" class="hidden">3</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <h2>Paused</h2>
+    <p class="sub">Your Doh is taking a breather.</p>
+    <button id="resume" class="btn">Resume</button>
+    <button id="quit" class="btn secondary">Quit to menu</button>
+  </div>
+</div>
+
+<div id="closet" class="overlay hidden">
+  <div class="panel">
+    <div class="chead"><h3>Closet</h3><span id="closetTokens" class="coin">🪙 0</span></div>
+    <canvas id="preview"></canvas>
+    <div class="tabs">
+      <button class="tab sel" data-slot="hat">Hats</button>
+      <button class="tab" data-slot="face">Faces</button>
+      <button class="tab" data-slot="outfit">Outfits</button>
+    </div>
+    <div id="items" class="grid scroll"></div>
+    <button id="closetDone" class="btn">Done</button>
+  </div>
+</div>
+<div id="toast" class="toast hidden"></div>
 
 <script>
 (() => {
@@ -209,7 +292,142 @@
     c.closePath();
   }
 
+  // ---------- closet items ----------
+  const ITEMS = [
+    { id: 'party',  slot: 'hat',    name: 'Party Hat',   price: 10 },
+    { id: 'chef',   slot: 'hat',    name: 'Chef Hat',    price: 20 },
+    { id: 'cowboy', slot: 'hat',    name: 'Cowboy Hat',  price: 30 },
+    { id: 'prop',   slot: 'hat',    name: 'Propeller',   price: 40 },
+    { id: 'tophat', slot: 'hat',    name: 'Top Hat',     price: 50 },
+    { id: 'crown',  slot: 'hat',    name: 'Crown',       price: 100 },
+    { id: 'nerd',   slot: 'face',   name: 'Nerd Specs',  price: 15 },
+    { id: 'shades', slot: 'face',   name: 'Shades',      price: 25 },
+    { id: 'stache', slot: 'face',   name: 'Mustache',    price: 30 },
+    { id: 'hearts', slot: 'face',   name: 'Heart Specs', price: 40 },
+    { id: 'bowtie', slot: 'outfit', name: 'Bow Tie',     price: 10 },
+    { id: 'tie',    slot: 'outfit', name: 'Necktie',     price: 15 },
+    { id: 'scarf',  slot: 'outfit', name: 'Scarf',       price: 25 },
+    { id: 'cape',   slot: 'outfit', name: 'Hero Cape',   price: 60 },
+  ];
+  // where each Doh's face sits (vertical offset in radii, scale) so glasses line up
+  const FACE_XF = { cube: [0.05, 1], gumdrop: [0.12, 0.95], dohnut: [-0.55, 0.62] };
+
+  function heart(c, x, y, s) {
+    c.beginPath(); c.moveTo(x, y + s * 0.9);
+    c.bezierCurveTo(x - s * 1.5, y - s * 0.1, x - s * 0.7, y - s * 1.1, x, y - s * 0.4);
+    c.bezierCurveTo(x + s * 0.7, y - s * 1.1, x + s * 1.5, y - s * 0.1, x, y + s * 0.9);
+    c.closePath();
+  }
+
+  function wearBack(c, r, w, st) {
+    if (w.outfit !== 'cape') return;
+    const wv = Math.sin((st.t || 0) * 8) * r * 0.08;
+    c.lineWidth = r * 0.07; c.strokeStyle = OUT; c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo(-r * 0.6, -r * 0.2); c.lineTo(r * 0.6, -r * 0.2);
+    c.quadraticCurveTo(r * 1.5, r * 0.6, r * 1.3 + wv, r * 1.45);
+    c.quadraticCurveTo(0, r * 1.2, -r * 1.3 - wv, r * 1.45);
+    c.quadraticCurveTo(-r * 1.5, r * 0.6, -r * 0.6, -r * 0.2);
+    c.closePath(); c.fillStyle = '#ff4d6d'; c.fill(); c.stroke();
+  }
+
+  function wearFront(c, id, r, w, st) {
+    const t = st.t || 0;
+    c.lineWidth = r * 0.07; c.strokeStyle = OUT; c.lineJoin = 'round'; c.lineCap = 'round';
+    const fill = col => { c.fillStyle = col; c.fill(); c.stroke(); };
+
+    if (w.face) {
+      const [oy, k] = FACE_XF[id] || [0, 1];
+      const ey = -r * 0.12, ex = r * 0.36;
+      c.save(); c.translate(0, oy * r); c.scale(k, k);
+      if (w.face === 'shades') {
+        for (const s of [-1, 1]) { rrPath(c, s * ex - r * 0.3, ey - r * 0.2, r * 0.6, r * 0.38, r * 0.14); fill('#2a1f33'); }
+        c.beginPath(); c.moveTo(-r * 0.07, ey - r * 0.08); c.lineTo(r * 0.07, ey - r * 0.08); c.stroke();
+        c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = r * 0.05;
+        for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * ex - r * 0.2, ey - r * 0.1); c.lineTo(s * ex - r * 0.08, ey - r * 0.02); c.stroke(); }
+      } else if (w.face === 'nerd') {
+        c.lineWidth = r * 0.08;
+        for (const s of [-1, 1]) { c.beginPath(); c.arc(s * ex, ey, r * 0.27, 0, TAU); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fill(); c.stroke(); }
+        c.beginPath(); c.moveTo(-ex + r * 0.27, ey); c.lineTo(ex - r * 0.27, ey); c.stroke();
+      } else if (w.face === 'hearts') {
+        for (const s of [-1, 1]) {
+          heart(c, s * ex, ey - r * 0.02, r * 0.27); fill('rgba(255,95,162,0.9)');
+          c.fillStyle = 'rgba(255,255,255,0.8)'; c.beginPath(); c.ellipse(s * ex - r * 0.12, ey - r * 0.13, r * 0.05, r * 0.03, -0.6, 0, TAU); c.fill();
+        }
+      } else if (w.face === 'stache') {
+        c.translate(0, -r * 0.02);
+        c.beginPath(); c.moveTo(0, r * 0.06);
+        c.bezierCurveTo(-r * 0.15, -r * 0.06, -r * 0.4, -r * 0.02, -r * 0.5, r * 0.1);
+        c.bezierCurveTo(-r * 0.4, r * 0.2, -r * 0.2, r * 0.1, 0, r * 0.14);
+        c.bezierCurveTo(r * 0.2, r * 0.1, r * 0.4, r * 0.2, r * 0.5, r * 0.1);
+        c.bezierCurveTo(r * 0.4, -r * 0.02, r * 0.15, -r * 0.06, 0, r * 0.06);
+        c.closePath(); fill('#6b4429');
+      }
+      c.restore();
+    }
+
+    if (w.outfit) {
+      const o = w.outfit;
+      if (o === 'bowtie') {
+        const y = r * 0.84;
+        for (const s of [-1, 1]) { c.beginPath(); c.moveTo(0, y); c.lineTo(s * r * 0.4, y - r * 0.2); c.lineTo(s * r * 0.4, y + r * 0.2); c.closePath(); fill('#ff5fa2'); }
+        rrPath(c, -r * 0.1, y - r * 0.11, r * 0.2, r * 0.22, r * 0.06); fill('#d63a80');
+      } else if (o === 'tie') {
+        c.beginPath(); c.moveTo(-r * 0.12, r * 0.72); c.lineTo(r * 0.12, r * 0.72); c.lineTo(r * 0.2, r * 0.9); c.lineTo(0, r * 1.08); c.lineTo(-r * 0.2, r * 0.9); c.closePath(); fill('#3a8dff');
+        rrPath(c, -r * 0.15, r * 0.6, r * 0.3, r * 0.18, r * 0.06); fill('#2a6fd6');
+      } else if (o === 'scarf') {
+        rrPath(c, r * 0.28, r * 0.7, r * 0.3, r * 0.62, r * 0.1); fill('#ff7a4d');
+        rrPath(c, -r * 0.8, r * 0.58, r * 1.6, r * 0.3, r * 0.15); fill('#ff7a4d');
+        c.strokeStyle = '#fff'; c.lineWidth = r * 0.07;
+        for (const x of [-0.55, -0.2, 0.15, 0.5]) { c.beginPath(); c.moveTo(x * r, r * 0.64); c.lineTo(x * r, r * 0.82); c.stroke(); }
+      } else if (o === 'cape') {
+        c.beginPath(); c.arc(0, r * 0.82, r * 0.11, 0, TAU); fill('#ffd84d');
+      }
+    }
+
+    if (w.hat) {
+      const h = w.hat, y0 = -r * 0.86;
+      if (h === 'party') {
+        c.beginPath(); c.moveTo(-r * 0.4, y0); c.lineTo(0, y0 - r * 1.15); c.lineTo(r * 0.4, y0); c.closePath(); fill('#7a5cff');
+        c.fillStyle = '#ffd84d';
+        for (const [x, y] of [[-0.1, -0.3], [0.12, -0.55], [-0.02, -0.8]]) { c.beginPath(); c.arc(x * r, y0 + y * r, r * 0.06, 0, TAU); c.fill(); }
+        c.beginPath(); c.arc(0, y0 - r * 1.15, r * 0.12, 0, TAU); fill('#ffd84d');
+      } else if (h === 'chef') {
+        for (const [x, y, sz] of [[-0.36, -0.52, 0.34], [0.36, -0.52, 0.34], [0, -0.78, 0.38]]) { c.beginPath(); c.arc(x * r, y0 + y * r, sz * r, 0, TAU); fill('#fff'); }
+        rrPath(c, -r * 0.5, y0 - r * 0.18, r, r * 0.3, r * 0.08); fill('#fff');
+      } else if (h === 'cowboy') {
+        rrPath(c, -r * 0.42, y0 - r * 0.62, r * 0.84, r * 0.66, r * 0.26); fill('#c98748');
+        c.fillStyle = '#6b3f1d'; c.fillRect(-r * 0.42, y0 - r * 0.38, r * 0.84, r * 0.15);
+        rrPath(c, -r * 0.42, y0 - r * 0.62, r * 0.84, r * 0.66, r * 0.26); c.stroke();
+        c.beginPath(); c.ellipse(0, y0 + r * 0.02, r * 0.9, r * 0.2, 0, 0, TAU); fill('#b9763f');
+      } else if (h === 'prop') {
+        c.beginPath(); c.arc(0, y0 + r * 0.1, r * 0.58, Math.PI, TAU); c.closePath(); fill('#6fd3ff');
+        c.beginPath(); c.moveTo(0, y0 + r * 0.1); c.lineTo(0, y0 - r * 0.48); c.stroke();
+        c.beginPath(); c.moveTo(0, y0 - r * 0.48); c.lineTo(0, y0 - r * 0.62); c.stroke();
+        c.beginPath(); c.ellipse(0, y0 - r * 0.66, r * (0.12 + 0.5 * Math.abs(Math.cos(t * 16))), r * 0.07, 0, 0, TAU); fill('#ffd84d');
+      } else if (h === 'tophat') {
+        rrPath(c, -r * 0.46, y0 - r * 0.98, r * 0.92, r * 0.95, r * 0.1); fill('#3a2d45');
+        c.fillStyle = '#ff5fa2'; c.fillRect(-r * 0.46, y0 - r * 0.32, r * 0.92, r * 0.16);
+        rrPath(c, -r * 0.46, y0 - r * 0.98, r * 0.92, r * 0.95, r * 0.1); c.stroke();
+        rrPath(c, -r * 0.78, y0 - r * 0.1, r * 1.56, r * 0.22, r * 0.1); fill('#3a2d45');
+      } else if (h === 'crown') {
+        c.beginPath();
+        c.moveTo(-r * 0.55, y0 + r * 0.06); c.lineTo(-r * 0.55, y0 - r * 0.75); c.lineTo(-r * 0.28, y0 - r * 0.4);
+        c.lineTo(0, y0 - r * 0.9); c.lineTo(r * 0.28, y0 - r * 0.4); c.lineTo(r * 0.55, y0 - r * 0.75);
+        c.lineTo(r * 0.55, y0 + r * 0.06); c.closePath(); fill('#ffd84d');
+        c.beginPath(); c.arc(0, y0 - r * 0.2, r * 0.09, 0, TAU); fill('#ff5fa2');
+      }
+    }
+  }
+
   function drawDoh(c, id, r, st) {
+    const w = st.wear || {};
+    c.save(); wearBack(c, r, w, st); c.restore();
+    drawBody(c, id, r, st);
+    c.save(); wearFront(c, id, r, w, st); c.restore();
+  }
+
+  function drawBody(c, id, r, st) {
     const t = st.t || 0;
     c.lineWidth = r * 0.09; c.strokeStyle = OUT; c.lineJoin = 'round';
     switch (id) {
@@ -331,7 +549,11 @@
   let state = 'menu';
   let dohIdx = Math.max(0, DOHS.findIndex(d => d.id === store.get('doh', 'cube')));
   let best = store.get('best', 0);
-  let score = 0, pipes = [], parts = [], scroll = 0, time = 0, flash = 0, shake = 0;
+  let score = 0, pipes = [], parts = [], pops = [], scroll = 0, time = 0, flash = 0, shake = 0;
+  let tokens = store.get('tokens', 0), runTokens = 0;
+  let owned = store.get('owned', []);
+  let equip = Object.assign({ hat: null, face: null, outfit: null }, store.get('equip', {}));
+  let paused = false, countdown = 0, closetOpen = false, closetSlot = 'hat', closetFrom = 'menu';
   const bird = { x: 0, y: H * 0.45, vy: 0, r: 22, rot: 0, s: 0, sv: 0, blinkT: 2, blink: 0, flapT: 0 };
   const clouds = Array.from({ length: 7 }, (_, i) => ({ x: i * 140 + Math.random() * 80, y: 40 + Math.random() * 220, s: 0.6 + Math.random() * 0.8 }));
 
@@ -343,7 +565,7 @@
   const scoreEl = $('score'), hintEl = $('hint'), menuEl = $('menu'), overEl = $('over');
 
   function reset() {
-    score = 0; pipes = []; parts = []; flash = 0; shake = 0;
+    score = 0; pipes = []; parts = []; pops = []; runTokens = 0; flash = 0; shake = 0;
     bird.x = Math.min(W * 0.3, 150); bird.y = H * 0.45; bird.vy = 0; bird.rot = 0; bird.s = 0; bird.sv = 0;
     scoreEl.textContent = '0';
   }
@@ -369,6 +591,7 @@
   }
 
   function tap() {
+    if (paused || closetOpen) return;
     unlockAudio();
     if (state === 'ready') { state = 'play'; hintEl.classList.add('hidden'); spawnInitial(); flap(); }
     else if (state === 'play') flap();
@@ -408,6 +631,8 @@
       if (state !== 'over') return;
       $('finalScore').textContent = score; $('finalBest').textContent = best;
       $('newBest').classList.toggle('hidden', !isBest || score === 0);
+      $('earned').textContent = '+' + runTokens + ' 🪙';
+      $('earned').classList.toggle('hidden', runTokens === 0);
       scoreEl.classList.add('hidden');
       overEl.classList.remove('hidden');
     }, 650);
@@ -464,6 +689,9 @@
         if (hitRect(bird.x, bird.y, R_HIT, p.x, -500, PW, top + 500) || hitRect(bird.x, bird.y, R_HIT, p.x, bot, PW, GY - bot)) { die(); break; }
         if (!p.scored && p.x + PW < bird.x) {
           p.scored = true; score++; scoreEl.textContent = score; sfx.point();
+          const gain = score % 10 === 0 ? 5 : 1;
+          setTokens(tokens + gain); runTokens += gain;
+          pops.push({ x: bird.x + 24, y: bird.y - 30, text: '+' + gain, life: 0.9, gold: gain > 1 });
           burst(bird.x + 20, bird.y - 20, '#ffd84d', 6, 120);
           scoreEl.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 180 });
         }
@@ -472,6 +700,8 @@
 
     for (const p of parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.vx *= 0.98; }
     parts = parts.filter(p => p.life > 0);
+    for (const p of pops) { p.life -= dt; p.y -= 45 * dt; }
+    pops = pops.filter(p => p.life > 0);
     for (const c of clouds) { if (moving) c.x -= spd * 0.15 * c.s * dt; if (c.x < -120) { c.x = W + 60 + Math.random() * 100; c.y = 40 + Math.random() * 220; } }
     flash = Math.max(0, flash - dt * 4);
     shake = Math.max(0, shake - dt);
@@ -548,8 +778,16 @@
     ctx.save();
     ctx.translate(bird.x, bird.y); ctx.rotate(bird.rot);
     ctx.scale(1 - s * 0.26, 1 + s * 0.32);
-    drawDoh(ctx, DOHS[dohIdx].id, bird.r, { t: time, blink: bird.blink > 0, dead: state === 'dying' || state === 'over', flap: bird.flapT > 0 });
+    drawDoh(ctx, DOHS[dohIdx].id, bird.r, { t: time, blink: bird.blink > 0, dead: state === 'dying' || state === 'over', flap: bird.flapT > 0, wear: equip });
     ctx.restore();
+
+    ctx.font = '900 24px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+    for (const p of pops) {
+      ctx.globalAlpha = Math.min(1, p.life * 2.5);
+      ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.strokeText(p.text + ' 🪙', p.x, p.y);
+      ctx.fillStyle = p.gold ? '#ffd84d' : '#fff'; ctx.fillText(p.text + ' 🪙', p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
 
     if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.7})`; ctx.fillRect(-20, -20, W + 40, H + 40); }
   }
@@ -557,7 +795,16 @@
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.033, (now - last) / 1000); last = now;
-    update(dt); render();
+    if (paused) {
+      if (countdown > 0) {
+        countdown -= dt;
+        if (countdown <= 0) { paused = false; countEl.classList.add('hidden'); }
+        else countEl.textContent = Math.ceil(countdown / 0.8);
+      }
+    } else update(dt);
+    render();
+    if (closetOpen) drawPreview();
+    syncUI();
     requestAnimationFrame(frame);
   }
 
@@ -569,8 +816,9 @@
       const b = document.createElement('button');
       b.className = 'card' + (i === dohIdx ? ' sel' : '');
       const c = document.createElement('canvas'); c.width = 64 * dpr; c.height = 64 * dpr;
-      const x = c.getContext('2d'); x.scale(dpr, dpr); x.translate(32, 33);
-      drawDoh(x, d.id, 24, { t: 1 });
+      const x = c.getContext('2d'); x.scale(dpr, dpr);
+      x.translate(32, equip.hat ? 38 : 33);
+      drawDoh(x, d.id, equip.hat ? 18 : 22, { t: 1, wear: equip });
       b.appendChild(c); b.appendChild(document.createTextNode(d.name));
       b.addEventListener('click', () => {
         unlockAudio(); dohIdx = i; store.set('doh', d.id);
@@ -581,6 +829,121 @@
     });
   }
 
+  // ---------- tokens, closet ----------
+  const hudEl = $('hud'), pauseBtn = $('pauseBtn'), pauseEl = $('pause'), countEl = $('count'), closetEl = $('closet');
+  function setTokens(n) {
+    tokens = n; store.set('tokens', n);
+    const txt = '🪙 ' + n;
+    hudEl.textContent = txt; $('menuTokens').textContent = txt; $('closetTokens').textContent = txt;
+  }
+  let toastT = 0;
+  function toast(msg) {
+    const el = $('toast'); el.textContent = msg; el.classList.remove('hidden');
+    clearTimeout(toastT); toastT = setTimeout(() => el.classList.add('hidden'), 1500);
+  }
+
+  function buildCloset() {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('sel', b.dataset.slot === closetSlot));
+    const wrap = $('items'); wrap.innerHTML = ''; wrap.scrollTop = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const id = DOHS[dohIdx].id;
+    const list = [{ id: null, name: 'None' }].concat(ITEMS.filter(i => i.slot === closetSlot));
+    list.forEach(it => {
+      const worn = equip[closetSlot] === it.id;
+      const isOwned = it.id === null || owned.includes(it.id);
+      const cant = !isOwned && tokens < it.price;
+      const b = document.createElement('button');
+      b.className = 'card' + (worn ? ' sel' : '') + (cant ? ' cant' : '');
+      const c = document.createElement('canvas'); c.width = 64 * dpr; c.height = 64 * dpr;
+      const x = c.getContext('2d'); x.scale(dpr, dpr); x.translate(32, 38);
+      drawDoh(x, id, 16, { t: 1, wear: { [closetSlot]: it.id } });
+      b.appendChild(c); b.appendChild(document.createTextNode(it.name));
+      const p = document.createElement('span'); p.className = 'price';
+      p.textContent = worn ? 'Wearing' : it.id === null ? 'Take off' : isOwned ? 'Owned' : '🪙 ' + it.price;
+      b.appendChild(p);
+      b.addEventListener('click', () => onItem(it, b));
+      wrap.appendChild(b);
+    });
+  }
+
+  function onItem(it, el) {
+    unlockAudio();
+    const slot = closetSlot;
+    if (it.id === null || owned.includes(it.id)) {
+      equip[slot] = (it.id !== null && equip[slot] === it.id) ? null : it.id;   // tap a worn item to take it off
+      sfx.flap();
+    } else if (tokens >= it.price) {
+      setTokens(tokens - it.price); owned.push(it.id); store.set('owned', owned);
+      equip[slot] = it.id; sfx.point();
+      toast('Bought ' + it.name + '!');
+    } else {
+      el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+      toast('Need ' + (it.price - tokens) + ' more 🪙');
+      tone(220, 110, 0.18, 'square', 0.06);
+      return;
+    }
+    store.set('equip', equip);
+    buildCloset();
+  }
+
+  function openCloset(from) {
+    closetFrom = from; closetOpen = true;
+    menuEl.classList.add('hidden'); overEl.classList.add('hidden');
+    closetEl.classList.remove('hidden'); buildCloset();
+  }
+  function closeCloset() {
+    closetOpen = false; closetEl.classList.add('hidden');
+    if (closetFrom === 'over') overEl.classList.remove('hidden'); else menuEl.classList.remove('hidden');
+    buildCards();
+  }
+
+  const pv = $('preview'), pctx = pv.getContext('2d');
+  function drawPreview() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    if (pv.width !== Math.round(112 * dpr)) { pv.width = pv.height = Math.round(112 * dpr); }
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0); pctx.clearRect(0, 0, 112, 112);
+    const sq = Math.sin(time * 3) * 0.04;
+    pctx.save(); pctx.translate(56, 68 + Math.sin(time * 2) * 2); pctx.scale(1 - sq, 1 + sq);
+    drawDoh(pctx, DOHS[dohIdx].id, 30, { t: time, blink: bird.blink > 0, wear: equip });
+    pctx.restore();
+  }
+
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { closetSlot = b.dataset.slot; buildCloset(); }));
+  $('openCloset').addEventListener('click', () => openCloset('menu'));
+  $('overCloset').addEventListener('click', () => openCloset('over'));
+  $('closetDone').addEventListener('click', closeCloset);
+
+  // ---------- pause (auto-pauses when you leave the app) ----------
+  function pauseGame() {
+    if (paused) {
+      if (countdown > 0) { countdown = 0; countEl.classList.add('hidden'); pauseEl.classList.remove('hidden'); }
+      return;
+    }
+    if (state !== 'play' && state !== 'dying') return;
+    paused = true; countdown = 0;
+    pauseEl.classList.remove('hidden');
+    if (actx && actx.state === 'running') { try { actx.suspend(); } catch (e) {} }
+  }
+  function resumeGame() {
+    if (!paused || countdown > 0) return;
+    unlockAudio();
+    pauseEl.classList.add('hidden');
+    countdown = 2.4; countEl.textContent = '3'; countEl.classList.remove('hidden');
+  }
+  function syncUI() {
+    pauseBtn.classList.toggle('hidden', !(state === 'play' && !paused));
+    hudEl.classList.toggle('hidden', paused || !(state === 'ready' || state === 'play' || state === 'dying'));
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+  window.addEventListener('pagehide', pauseGame);
+  window.addEventListener('blur', pauseGame);
+  pauseBtn.addEventListener('click', pauseGame);
+  $('resume').addEventListener('click', resumeGame);
+  $('quit').addEventListener('click', () => { paused = false; countdown = 0; pauseEl.classList.add('hidden'); countEl.classList.add('hidden'); toMenu(); });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); paused ? resumeGame() : pauseGame(); }
+  });
+
   function syncMute() { $('mute').textContent = muted ? '🔇' : '🔊'; }
   $('mute').addEventListener('click', () => { muted = !muted; store.set('muted', muted); syncMute(); unlockAudio(); });
   $('play').addEventListener('click', () => { unlockAudio(); toReady(); });
@@ -589,10 +952,11 @@
 
   cvs.addEventListener('pointerdown', e => { e.preventDefault(); tap(); });
   window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); tap(); } });
-  document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  document.addEventListener('touchmove', e => { if (e.target.closest && e.target.closest('.scroll')) return; e.preventDefault(); }, { passive: false });
   document.addEventListener('gesturestart', e => e.preventDefault());
 
   syncMute();
+  setTokens(tokens);
   toMenu();
   requestAnimationFrame(frame);
 
