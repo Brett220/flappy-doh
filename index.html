@@ -151,6 +151,8 @@
   }
   .tab.sel { background: var(--pink); color: #fff; }
   .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; flex: 1 1 auto; min-height: 0; }
+  #menu .panel { display: flex; flex-direction: column; max-height: 100%; }
+  #dohs { padding: 3px; align-content: start; }
   #items { padding: 3px; margin-bottom: 12px; align-content: start; }
   .card .price { display: block; margin-top: 3px; font-size: 11px; opacity: .85; }
   .card.cant .price { color: #c0264f; }
@@ -191,7 +193,7 @@
   <div class="panel">
     <h1>Flappy<span>Doh</span></h1>
     <p class="sub">Pick your Doh</p>
-    <div id="dohs" class="grid"></div>
+    <div id="dohs" class="grid scroll"></div>
     <button id="play" class="btn">Play</button>
     <div class="duo"><button id="openCloset" class="btn secondary">👒 My Closet</button><button id="openShop" class="btn secondary">🛍️ Shop</button></div>
     <div class="row"><span id="menuBest">Best: 0</span><span id="menuTokens" class="coin"><span class="ci"></span>0</span><button id="mute" class="icon-btn" aria-label="Sound">🔊</button></div>
@@ -241,6 +243,7 @@
       <button class="tab sel" data-slot="hat">Hats</button>
       <button class="tab" data-slot="face">Faces</button>
       <button class="tab" data-slot="outfit">Outfits</button>
+      <button class="tab" data-slot="bling">Bling</button>
     </div>
     <div id="items" class="grid scroll"></div>
     <button id="closetDone" class="btn">Done</button>
@@ -272,6 +275,7 @@
     { id: 'dohnut',   name: 'Dohnut',          puff: '#ffb3d9' },
     { id: 'classic',  name: 'Groovy Glob',     puff: '#b8f27a' },
     { id: 'stardust', name: 'Stardust',        puff: '#d6b8ff' },
+    { id: 'retriever', name: 'Golden Retriever', puff: '#f2c46d' },
   ];
   const OUT = '#2a1f33';
   const TAU = Math.PI * 2;
@@ -340,9 +344,14 @@
     { id: 'tie',    slot: 'outfit', name: 'Necktie',     price: 15 },
     { id: 'scarf',  slot: 'outfit', name: 'Scarf',       price: 25 },
     { id: 'cape',   slot: 'outfit', name: 'Hero Cape',   price: 60 },
+    { id: 'tiger',  slot: 'outfit', name: 'Tiger Stripes Tee', price: 45 },
+    { id: 'doggy',  slot: 'outfit', name: 'Doggy Costume', price: 70 },
+    { id: 'dino',   slot: 'outfit', name: 'Dino Costume', price: 75 },
+    { id: 'bunny',  slot: 'outfit', name: 'Plush Bunny', price: 80 },
+    { id: 'chain',  slot: 'bling',  name: 'Gold Chain',  price: 90 },
   ];
   // where each Doh's face sits (vertical offset in radii, scale) so glasses line up
-  const FACE_XF = { cube: [0.05, 1], gumdrop: [0.12, 0.95], dohnut: [-0.55, 0.62] };
+  const FACE_XF = { cube: [0.05, 1], retriever: [0.05, 1], gumdrop: [0.12, 0.95], dohnut: [-0.55, 0.62] };
 
   function heart(c, x, y, s) {
     c.beginPath(); c.moveTo(x, y + s * 0.9);
@@ -351,22 +360,56 @@
     c.closePath();
   }
 
+  function bodyClip(c, id, r) {
+    if (id === 'cube' || id === 'retriever') rrPath(c, -r, -r, 2 * r, 2 * r, r * 0.42);
+    else if (id === 'gumdrop') gumdropPath(c, r);
+    else { c.beginPath(); c.arc(0, 0, r, 0, TAU); }
+  }
+  function withFace(c, id, r, fn) {
+    const [oy, k] = FACE_XF[id] || [0, 1];
+    c.save(); c.translate(0, oy * r); c.scale(k, k); fn(); c.restore();
+  }
+
   function wearBack(c, r, w, st) {
-    if (w.outfit !== 'cape') return;
-    const wv = Math.sin((st.t || 0) * 8) * r * 0.08;
+    const t = st.t || 0, o = w.outfit;
     c.lineWidth = r * 0.07; c.strokeStyle = OUT; c.lineJoin = 'round';
-    c.beginPath();
-    c.moveTo(-r * 0.6, -r * 0.2); c.lineTo(r * 0.6, -r * 0.2);
-    c.quadraticCurveTo(r * 1.5, r * 0.6, r * 1.3 + wv, r * 1.45);
-    c.quadraticCurveTo(0, r * 1.2, -r * 1.3 - wv, r * 1.45);
-    c.quadraticCurveTo(-r * 1.5, r * 0.6, -r * 0.6, -r * 0.2);
-    c.closePath(); c.fillStyle = '#ff4d6d'; c.fill(); c.stroke();
+    if (o === 'cape') {
+      const wv = Math.sin(t * 8) * r * 0.08;
+      c.beginPath();
+      c.moveTo(-r * 0.6, -r * 0.2); c.lineTo(r * 0.6, -r * 0.2);
+      c.quadraticCurveTo(r * 1.5, r * 0.6, r * 1.3 + wv, r * 1.45);
+      c.quadraticCurveTo(0, r * 1.2, -r * 1.3 - wv, r * 1.45);
+      c.quadraticCurveTo(-r * 1.5, r * 0.6, -r * 0.6, -r * 0.2);
+      c.closePath(); c.fillStyle = '#ff4d6d'; c.fill(); c.stroke();
+    } else if (o === 'dino') {
+      c.beginPath(); c.moveTo(-r * 0.7, r * 0.25); c.quadraticCurveTo(-r * 1.3, r * 0.3, -r * 1.85, r * 0.95);
+      c.quadraticCurveTo(-r * 1.2, r * 1.05, -r * 0.7, r * 0.9); c.closePath();
+      c.fillStyle = '#5fc66b'; c.fill(); c.stroke();
+      c.fillStyle = '#ff9f3d';
+      for (const x of [-0.5, 0, 0.5]) {
+        c.beginPath(); c.moveTo((x - 0.2) * r, -r * 0.8); c.lineTo(x * r, -r * 1.3); c.lineTo((x + 0.2) * r, -r * 0.8); c.closePath(); c.fill(); c.stroke();
+      }
+    } else if (o === 'doggy') {
+      c.save(); c.translate(-r * 0.85, r * 0.35); c.rotate(-0.5 + Math.sin(t * 12) * 0.35);
+      c.beginPath(); c.ellipse(-r * 0.35, 0, r * 0.45, r * 0.14, 0, 0, TAU);
+      c.fillStyle = '#a56f35'; c.fill(); c.stroke(); c.restore();
+    } else if (o === 'bunny') {
+      for (const s of [-1, 1]) {
+        c.save(); c.translate(s * r * 0.42, -r * 0.8); c.rotate(s * 0.3 + Math.sin(t * 3 + s) * 0.04);
+        c.beginPath(); c.ellipse(0, -r * 0.55, r * 0.22, r * 0.62, 0, 0, TAU); c.fillStyle = '#fff4f8'; c.fill(); c.stroke();
+        c.beginPath(); c.ellipse(0, -r * 0.55, r * 0.1, r * 0.44, 0, 0, TAU); c.fillStyle = '#ffb6cf'; c.fill();
+        c.restore();
+      }
+      c.beginPath(); c.arc(-r * 0.95, r * 0.7, r * 0.22, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.stroke();
+    }
   }
 
   function wearFront(c, id, r, w, st) {
     const t = st.t || 0;
     c.lineWidth = r * 0.07; c.strokeStyle = OUT; c.lineJoin = 'round'; c.lineCap = 'round';
     const fill = col => { c.fillStyle = col; c.fill(); c.stroke(); };
+    const tints = { dino: 'rgba(95,198,107,0.38)', doggy: 'rgba(201,148,86,0.4)', bunny: 'rgba(255,240,246,0.5)' };
+    if (tints[w.outfit]) { c.save(); bodyClip(c, id, r); c.fillStyle = tints[w.outfit]; c.fill(); c.restore(); }
 
     if (w.face) {
       const [oy, k] = FACE_XF[id] || [0, 1];
@@ -414,7 +457,41 @@
         for (const x of [-0.55, -0.2, 0.15, 0.5]) { c.beginPath(); c.moveTo(x * r, r * 0.64); c.lineTo(x * r, r * 0.82); c.stroke(); }
       } else if (o === 'cape') {
         c.beginPath(); c.arc(0, r * 0.82, r * 0.11, 0, TAU); fill('#ffd84d');
+      } else if (o === 'tiger') {
+        // black and gold tiger-stripe tee
+        c.save(); bodyClip(c, id, r); c.clip();
+        c.beginPath();
+        c.moveTo(-1.3 * r, r * 0.3); c.lineTo(-r * 0.32, r * 0.3); c.quadraticCurveTo(0, r * 0.62, r * 0.32, r * 0.3);
+        c.lineTo(1.3 * r, r * 0.3); c.lineTo(1.3 * r, 1.3 * r); c.lineTo(-1.3 * r, 1.3 * r); c.closePath();
+        c.fillStyle = '#1d1b22'; c.fill();
+        c.strokeStyle = '#f2b52b'; c.lineWidth = r * 0.1;
+        for (const x of [-0.75, -0.4, 0.4, 0.75]) {
+          c.beginPath(); c.moveTo((x - 0.08) * r, r * 0.45); c.lineTo((x + 0.08) * r, r * 0.66);
+          c.moveTo((x + 0.06) * r, r * 0.78); c.lineTo((x - 0.06) * r, r * 0.96); c.stroke();
+        }
+        c.beginPath(); c.moveTo(-r * 0.32, r * 0.3); c.quadraticCurveTo(0, r * 0.62, r * 0.32, r * 0.3);
+        c.lineWidth = r * 0.08; c.stroke();
+        c.restore();
+        bodyClip(c, id, r); c.strokeStyle = OUT; c.lineWidth = r * 0.09; c.stroke();
+      } else if (o === 'dino') {
+        c.beginPath(); c.ellipse(0, r * 0.7, r * 0.52, r * 0.28, 0, 0, TAU); fill('#e2f7a6');
+        for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * r * 0.97, r * 0.38, r * 0.2, r * 0.13, s * 0.5, 0, TAU); fill('#5fc66b'); }
+      } else if (o === 'doggy') {
+        for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * r * 0.84, -r * 0.5, r * 0.22, r * 0.42, s * 0.4, 0, TAU); fill('#8a5a2b'); }
+        withFace(c, id, r, () => { c.beginPath(); c.ellipse(0, r * 0.06, r * 0.1, r * 0.07, 0, 0, TAU); c.fillStyle = OUT; c.fill(); });
+        rrPath(c, -r * 0.55, r * 0.68, r * 1.1, r * 0.17, r * 0.06); fill('#e8453c');
+        c.beginPath(); c.arc(0, r * 0.98, r * 0.1, 0, TAU); fill('#ffd84d');
+      } else if (o === 'bunny') {
+        withFace(c, id, r, () => { c.beginPath(); c.ellipse(0, r * 0.07, r * 0.09, r * 0.065, 0, 0, TAU); c.fillStyle = '#ff8fb0'; c.fill(); });
       }
+    }
+
+    if (w.bling === 'chain') {
+      const chain = () => { c.beginPath(); c.moveTo(-r * 0.7, r * 0.46); c.quadraticCurveTo(0, r * 1.25, r * 0.7, r * 0.46); };
+      chain(); c.strokeStyle = OUT; c.lineWidth = r * 0.17; c.stroke();
+      chain(); c.strokeStyle = '#ffd84d'; c.lineWidth = r * 0.09; c.setLineDash([r * 0.13, r * 0.05]); c.stroke(); c.setLineDash([]);
+      c.strokeStyle = OUT; c.lineWidth = r * 0.07;
+      c.beginPath(); c.arc(0, r * 0.88, r * 0.13, 0, TAU); fill('#ffd84d');
     }
 
     if (w.hat) {
@@ -539,6 +616,32 @@
         face(c, r, st, 0, 1);
         break;
       }
+      case 'retriever': {
+        // floppy ears sit behind the head
+        for (const s of [-1, 1]) {
+          c.save(); c.translate(s * r * 0.98, -r * 0.05); c.rotate(s * 0.18 + Math.sin(t * 3) * 0.04 * s);
+          c.beginPath(); c.ellipse(0, r * 0.12, r * 0.3, r * 0.58, 0, 0, TAU);
+          c.fillStyle = '#b97a2e'; c.fill(); c.stroke(); c.restore();
+        }
+        const g = c.createLinearGradient(-r, -r, r, r);
+        g.addColorStop(0, '#ffe7a8'); g.addColorStop(0.5, '#f4c167'); g.addColorStop(1, '#d9953d');
+        rrPath(c, -r, -r, 2 * r, 2 * r, r * 0.42); c.fillStyle = g; c.fill(); c.stroke();
+        c.fillStyle = 'rgba(255,255,255,0.45)'; rrPath(c, -r * 0.72, -r * 0.8, r * 0.7, r * 0.26, r * 0.13); c.fill();
+        c.strokeStyle = 'rgba(185,122,46,0.55)'; c.lineWidth = r * 0.05; c.lineCap = 'round';
+        for (const [x, y] of [[-0.6, 0.55], [0.55, 0.62], [0.7, -0.5], [-0.7, -0.35]]) {
+          c.beginPath(); c.moveTo(x * r, y * r); c.lineTo(x * r + r * 0.1, y * r + r * 0.14);
+          c.moveTo(x * r + r * 0.14, y * r - r * 0.02); c.lineTo(x * r + r * 0.24, y * r + r * 0.12); c.stroke();
+        }
+        c.strokeStyle = OUT; c.lineWidth = r * 0.09;
+        c.fillStyle = '#fff3d6'; c.beginPath(); c.ellipse(0, r * 0.32, r * 0.44, r * 0.32, 0, 0, TAU); c.fill();
+        if (!st.dead) {
+          c.beginPath(); c.ellipse(r * 0.02, r * 0.46, r * 0.1, r * 0.13, 0, 0, TAU);
+          c.fillStyle = '#ff7a9a'; c.fill(); c.lineWidth = r * 0.05; c.stroke(); c.lineWidth = r * 0.09;
+        }
+        face(c, r, st, r * 0.05, 1);
+        c.fillStyle = OUT; c.beginPath(); c.ellipse(0, r * 0.1, r * 0.12, r * 0.08, 0, 0, TAU); c.fill();
+        break;
+      }
     }
   }
 
@@ -594,7 +697,7 @@
   let score = 0, pipes = [], parts = [], pops = [], scroll = 0, time = 0, flash = 0, shake = 0;
   let tokens = store.get('tokens', 0), runTokens = 0;
   let owned = store.get('owned', []);
-  let equip = Object.assign({ hat: null, face: null, outfit: null }, store.get('equip', {}));
+  let equip = Object.assign({ hat: null, face: null, outfit: null, bling: null }, store.get('equip', {}));
   let rings = [], wasStar = false, starT = 0, closetMode = 'mine', confirmItem = null;
   let paused = false, countdown = 0, closetOpen = false, closetSlot = 'hat', closetFrom = 'menu';
   const bird = { x: 0, y: H * 0.45, vy: 0, r: 22, rot: 0, s: 0, sv: 0, blinkT: 2, blink: 0, flapT: 0 };
@@ -930,8 +1033,9 @@
       b.className = 'card' + (i === dohIdx ? ' sel' : '');
       const c = document.createElement('canvas'); c.width = 64 * dpr; c.height = 64 * dpr;
       const x = c.getContext('2d'); x.scale(dpr, dpr);
-      x.translate(32, equip.hat ? 38 : 33);
-      drawDoh(x, d.id, equip.hat ? 18 : 22, { t: 1, wear: equip });
+      const small = !!equip.hat || ['dino', 'doggy', 'bunny'].includes(equip.outfit);
+      x.translate(32, small ? 38 : 33);
+      drawDoh(x, d.id, small ? 17 : 22, { t: 1, wear: equip });
       b.appendChild(c); b.appendChild(document.createTextNode(d.name));
       b.addEventListener('click', () => {
         unlockAudio(); dohIdx = i; store.set('doh', d.id);
