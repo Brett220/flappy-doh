@@ -1,7 +1,7 @@
 // Offline support: always try the network first so updates show up right away,
 // and fall back to the saved copy when there is no connection.
 // Bump VERSION when you change files to force a clean re-download.
-const VERSION = 'flappydoh-v4';
+const VERSION = 'flappydoh-v5';
 const FILES = ['./', './index.html', './manifest.json', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
