@@ -1602,7 +1602,7 @@
   const HOLEW = 120;
 
   const G = 1500, FLAP = -440, R_HIT = 18;
-  const starNow = () => (state === 'play' || state === 'dying' || state === 'over' || state === 'crypt' || state === 'rewind' || state === 'sleighride') && ((score >= 20 && score < 25) || (score >= 40 && score < 50));
+  const starNow = () => (state === 'play' || state === 'dying' || state === 'over' || state === 'crypt' || state === 'rewind' || state === 'sleighride' || state === 'flip') && ((score >= 20 && score < 25) || (score >= 40 && score < 50));
   const gapFor = () => Math.max(140, 182 - effScore() * 1.4);
   const speedFor = () => Math.min(235, 165 + effScore() * 2);
 
@@ -1933,7 +1933,22 @@
   }
 
   // ---------- events: rewind portal + upside-down replay, sleigh ride, snowball fight ----------
-  let flipK = 1, flipTarget = 1, flipLeft = 0, flipSpawn = 0, portalIdx = 0, portalNext = 16, rewindT = 0;
+  let flipK = 1, flipTarget = 1, flipLeft = 0, flipSpawn = 0, portalIdx = 0, portalNext = 16, rewindT = 0, flipHold = 0;
+  // the world freezes while the screen flips, holds for a beat, then gives you clear space before the next pillar
+  function startFlip(target) {
+    state = 'flip'; flipTarget = target; flipHold = 0.75;
+    bird.vy = 0; bird.rot = 0; snowballs = [];
+  }
+  function flipUpdate(dt) {
+    bird.y += Math.sin(time * 6) * 8 * dt;           // gentle hover while frozen
+    if (flipK !== flipTarget) return;
+    flipHold -= dt;
+    if (flipHold > 0) return;
+    state = 'play'; bird.vy = -120; invuln = Math.max(invuln, 0.8);
+    const next = pipes.find(p => !p.scored && p.x + PW > bird.x - 10);
+    if (next) { const push = Math.max(0, bird.x + 270 - next.x); for (const p of pipes) if (p.x + PW > bird.x - 10) p.x += push; }
+    else pipes.push(makePipe(bird.x + 300, bird.y));
+  }
   let sleighIdx = 0, sleighNext = 12, swoop = null, ride = null;
   let fightIdx = 0, fightNext = 32, fightSpawn = 0, fightLeft = 0, snowballs = [];
   const portalAt = i => (HW() ? 14 : 16) + i * 30 + Math.floor(Math.random() * 3);
@@ -1954,7 +1969,7 @@
   function eventPassed(p) {
     if (p.flipPipe && flipLeft > 0) {
       flipLeft--;
-      if (flipLeft === 0) { flipTarget = 1; invuln = Math.max(invuln, 0.9); banner = { text: 'RIGHT SIDE UP!', sub: 'Welcome back', life: 1.6 }; sfx.rewind(true); }
+      if (flipLeft === 0) { startFlip(1); banner = { text: 'RIGHT SIDE UP!', sub: 'Get ready...', life: 1.6 }; sfx.rewind(true); }
     }
     if (p.fight && fightLeft > 0) {
       fightLeft--;
@@ -1977,9 +1992,9 @@
     scroll = Math.max(0, scroll - spd * 3.2 * dt);
     bird.rot -= dt * 9; bird.y += (H * 0.45 - bird.y) * Math.min(1, dt * 3);
     if (rewindT >= 1.15) {
-      state = 'play'; bird.rot = 0; bird.vy = -150; invuln = 1.1;
-      flipSpawn = 10; flipLeft = 10; flipTarget = -1;
+      bird.rot = 0; flipSpawn = 10; flipLeft = 10;
       pipes = []; pipes.push(makePipe(bird.x + 300, H * 0.45));
+      startFlip(-1);
       banner = { text: 'UPSIDE DOWN!', sub: 'Golden treats for 10 pillars', life: 2.2 };
     }
   }
@@ -2076,6 +2091,7 @@
   function eventsUpdate(dt, spd) {
     if (flipK !== flipTarget) { const d = flipTarget - flipK, st = dt * 3.2; flipK = Math.abs(d) <= st ? flipTarget : flipK + Math.sign(d) * st; }
     if (state === 'rewind') rewindUpdate(dt, spd);
+    if (state === 'flip') flipUpdate(dt);
     if (state === 'sleighride') rideUpdate(dt, spd);
     if (swoop) swoopUpdate(dt);
     fightUpdate(dt);
@@ -3387,7 +3403,7 @@
       if (countdown > 0) { countdown = 0; countEl.classList.add('hidden'); pauseEl.classList.remove('hidden'); }
       return;
     }
-    if (state !== 'play' && state !== 'dying' && state !== 'crypt' && state !== 'sleighride') return;
+    if (state !== 'play' && state !== 'dying' && state !== 'crypt' && state !== 'sleighride' && state !== 'flip') return;
     paused = true; countdown = 0;
     pauseEl.classList.remove('hidden');
     if (actx && actx.state === 'running') { try { actx.suspend(); } catch (e) {} }
@@ -3399,8 +3415,8 @@
     countdown = 2.4; countEl.textContent = '3'; countEl.classList.remove('hidden');
   }
   function syncUI() {
-    pauseBtn.classList.toggle('hidden', !((state === 'play' || state === 'crypt' || state === 'sleighride') && !paused));
-    hudEl.classList.toggle('hidden', paused || !(state === 'ready' || state === 'play' || state === 'dying' || state === 'crypt' || state === 'rewind' || state === 'sleighride'));
+    pauseBtn.classList.toggle('hidden', !((state === 'play' || state === 'crypt' || state === 'sleighride' || state === 'flip') && !paused));
+    hudEl.classList.toggle('hidden', paused || !(state === 'ready' || state === 'play' || state === 'dying' || state === 'crypt' || state === 'rewind' || state === 'sleighride' || state === 'flip'));
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
   window.addEventListener('pagehide', pauseGame);
